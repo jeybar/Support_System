@@ -1,0 +1,39 @@
+/* تنظیمات کلی فوتر */
+.footer {
+    background-color: #495057; /* رنگ پس‌زمینه فوتر */
+    color: #ffffff; /* رنگ متن فوتر */
+    text-align: center; /* متن در مرکز */
+    padding: 15px 0; /* فاصله داخلی فوتر */
+    border-top: 1px solid #6c757d; /* خط بالای فوتر */
+    margin-top: auto; /* چسباندن فوتر به پایین صفحه */
+    font-size: 14px; /* اندازه متن فوتر */
+}
+
+/* استایل بارگذاری (Loading) */
+#loading {
+    display: none; /* پیش‌فرض: مخفی */
+    position: fixed; /* ثابت در صفحه */
+    top: 50%; /* در مرکز صفحه */
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9999; /* بالاترین لایه */
+}
+
+#loading .spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* حالت دارک‌مود (Dark Mode) */
+.dark-mode .footer {
+    background-color: #343a40; /* رنگ پس‌زمینه تیره */
+    color: #f8f9fa; /* رنگ متن روشن */
+}
+
+/* طراحی واکنش‌گرا */
+@media (max-width: 768px) {
+    .footer {
+        font-size: 12px; /* کاهش اندازه متن در صفحات کوچک */
+        padding: 10px; /* کاهش فاصله داخلی */
+    }
+}
