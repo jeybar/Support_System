@@ -1,0 +1,503 @@
+================================================================================
+فایل: assets.js (بخش 1/1)
+================================================================================
+/**
+ * فایل جاوا اسکریپت مدیریت تجهیزات سخت‌افزاری
+ * این فایل شامل تمام عملکردهای جاوا اسکریپت صفحه مدیریت تجهیزات است
+ */
+
+$(document).ready(function() {
+    console.log('Assets management page script loaded');
+    
+    // ==========================================
+    // بخش 1: تنظیمات اولیه و عمومی
+    // ==========================================
+    
+    // فعال‌سازی tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // ==========================================
+    // بخش 2: مدیریت مودال حذف تجهیز
+    // ==========================================
+    
+    // تنظیم عملکرد مودال حذف
+    const deleteButtons = document.querySelectorAll('.delete-btn');
+    const deleteForm = document.getElementById('deleteForm');
+    
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const assetId = this.getAttribute('data-id');
+            deleteForm.setAttribute('action', '/support_system/assets/delete/' + assetId);
+            
+            const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            deleteModal.show();
+        });
+    });
+    
+    // ==========================================
+    // بخش 3: مدیریت فرم جستجو
+    // ==========================================
+    
+    // دکمه پاک کردن فرم جستجو
+    $('#clear-form').on('click', function(e) {
+        e.preventDefault();
+        // پاک کردن همه فیلدهای فرم
+        $('#query').val('');
+        $('#model').prop('selectedIndex', 0);
+        $('#category').prop('selectedIndex', 0);
+        $('#employee_number').val('');
+        $('#asset_tag').val('');
+        $('#serial_number').val('');
+        $('#location').val('');
+        $('#status').prop('selectedIndex', 0);
+        
+        // هدایت به صفحه اصلی تجهیز‌ها
+        window.location.href = '/support_system/assets';
+    });
+    
+    // ==========================================
+    // بخش 4: مدیریت فرم افزودن تجهیز
+    // ==========================================
+    
+    // تابع مدیریت تغییر نوع تجهیز
+    function handleAssetTypeChange(assetType) {
+        console.log('Asset type changed to:', assetType);
+        
+        const computerNameContainer = $('#computer_name_container');
+        const computerNameInput = $('#computer_name');
+        
+        // بررسی نوع تجهیز
+        if (assetType === 'کامپیوتر اداری' || assetType === 'کامپیوتر دستگاه' || assetType === 'سرور') {
+            console.log('Showing computer name field');
+            // نمایش فیلد نام کامپیوتر و اجباری کردن آن
+            computerNameContainer.show();
+            computerNameInput.prop('required', true);
+        } else {
+            console.log('Hiding computer name field');
+            // مخفی کردن فیلد نام کامپیوتر و حذف اجباری بودن
+            computerNameContainer.hide();
+            computerNameInput.prop('required', false).val('');
+        }
+    }
+    
+    // استفاده از رویداد change برای فیلد نوع تجهیز
+    $(document).on('change', '#asset_type', function() {
+        handleAssetTypeChange(this.value);
+    });
+    
+    // تنظیم رویدادهای مودال افزودن تجهیز
+    $('#createAssetModal').on('show.bs.modal', function() {
+        console.log('Modal is showing');
+        
+        // مخفی کردن فیلد نام کامپیوتر در ابتدا
+        $('#computer_name_container').hide();
+        $('#computer_name').prop('required', false);
+        
+        // اضافه کردن container برای پیام‌های خطا اگر وجود نداشته باشد
+        if ($('#modal-error-container').length === 0) {
+            $('#createAssetModal .modal-body').prepend(`
+                <div id="modal-error-container" class="mb-3" style="display: none;">
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <span id="modal-error-message"></span>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                </div>
+            `);
+        }
+    });
+    
+    // ارسال فرم افزودن تجهیز با AJAX
+    $('#submit-asset-form').on('click', function() {
+        const form = $('#create-asset-form')[0];
+        
+        // بررسی اعتبارسنجی فرم
+        if (form.checkValidity()) {
+            // نمایش نشانگر بارگذاری
+            const submitBtn = $(this);
+            const originalBtnText = submitBtn.html();
+            submitBtn.html('<span class="spinner-border spinner-border-sm"></span> در حال ارسال...').prop('disabled', true);
+            
+            // ارسال فرم با AJAX
+            $.ajax({
+                url: form.action,
+                type: 'POST',
+                data: new FormData(form),
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(response) {
+                    // بررسی پاسخ
+                    if (response.success) {
+                        // بستن مودال
+                        const createAssetModal = bootstrap.Modal.getInstance(document.getElementById('createAssetModal'));
+                        createAssetModal.hide();
+                        
+                        // نمایش پیام موفقیت
+                        showAlert('success', response.message || 'تجهیز جدید با موفقیت اضافه شد.');
+                        
+                        // بارگذاری مجدد صفحه بعد از مکث کوتاه
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1000);
+                    } else if (response.error) {
+                        // نمایش خطا در مودال
+                        showModalError(response.error);
+                    } else if (response.errors && Array.isArray(response.errors)) {
+                        // نمایش لیست خطاها در مودال
+                        showModalError(response.errors.join('<br>'));
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error in AJAX request:', xhr);
+                    
+                    // تلاش برای دریافت پیام خطا از پاسخ JSON
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.error) {
+                            showModalError(response.error);
+                        } else {
+                            showModalError('خطا در ارسال اطلاعات. لطفاً دوباره تلاش کنید.');
+                        }
+                    } catch (e) {
+                        showModalError('خطا در ارسال اطلاعات. لطفاً دوباره تلاش کنید.');
+                    }
+                },
+                complete: function() {
+                    // بازگرداندن دکمه به حالت اولیه
+                    submitBtn.html(originalBtnText).prop('disabled', false);
+                }
+            });
+        } else {
+            // نمایش پیام‌های اعتبارسنجی
+            form.reportValidity();
+        }
+    });
+    
+    // نمایش خطا در مودال
+    function showModalError(message) {
+        const errorContainer = $('#modal-error-container');
+        const errorMessage = $('#modal-error-message');
+        
+        errorMessage.html(message);
+        errorContainer.show();
+        
+        // اسکرول به بالای مودال برای نمایش پیام خطا
+        $('#createAssetModal .modal-body').scrollTop(0);
+    }
+    
+    // پاک کردن فرم هنگام بستن مودال
+    $('#createAssetModal').on('hidden.bs.modal', function() {
+        console.log('Modal is hidden');
+        $('#create-asset-form')[0].reset();
+        
+        // بازنشانی لیست مدل‌ها
+        updateModelOptions();
+        
+        // مخفی کردن فیلد نام کامپیوتر
+        $('#computer_name_container').hide();
+        $('#computer_name').prop('required', false);
+        
+        // پاک کردن پیام‌های خطا
+        $('#modal-error-container').hide();
+        $('#modal-error-message').html('');
+    });
+    
+    // ==========================================
+    // بخش 5: مدیریت وابستگی دسته‌بندی و مدل
+    // ==========================================
+
+    // تعریف متغیرهای مورد نیاز
+    const categorySelect = $('#category_id');
+    const modelSelect = $('#model_id');
+
+    // استفاده از داده‌های ارسال شده از PHP
+    console.log('Checking modelsByCategoryData:', window.modelsByCategoryData);
+
+    // تابع بروزرسانی لیست مدل‌ها
+    function updateModelOptions() {
+        const categoryId = categorySelect.val();
+        console.log('Updating models for category ID:', categoryId);
+        
+        // پاک کردن گزینه‌های فعلی
+        modelSelect.empty();
+        
+        // افزودن گزینه پیش‌فرض
+        const defaultText = categoryId ? 'انتخاب مدل...' : 'ابتدا دسته‌بندی را انتخاب کنید...';
+        modelSelect.append(new Option(defaultText, ''));
+        
+        // اگر دسته‌بندی انتخاب شده و مدل‌های مرتبط وجود دارند
+        if (categoryId && window.modelsByCategoryData && window.modelsByCategoryData[categoryId]) {
+            console.log('Loading models for category ID:', categoryId, window.modelsByCategoryData[categoryId]);
+            
+            // افزودن مدل‌های مرتبط
+            window.modelsByCategoryData[categoryId].forEach(function(model) {
+                modelSelect.append(new Option(model.name, model.id));
+            });
+        } else if (categoryId) {
+            console.warn('No models found for category ID:', categoryId);
+            modelSelect.append(new Option('مدلی برای این دسته‌بندی وجود ندارد', ''));
+        }
+    }
+
+    // رویداد تغییر دسته‌بندی
+    categorySelect.on('change', updateModelOptions);
+
+    // اجرای اولیه برای تنظیم لیست مدل‌ها
+    updateModelOptions();
+    
+    // ==========================================
+    // بخش 6: مدیریت افزودن دسته‌بندی و مدل جدید
+    // ==========================================
+    
+    // دکمه افزودن دسته‌بندی جدید
+    $('#add-category-btn').on('click', function() {
+        const categoryName = prompt('نام دسته‌بندی جدید را وارد کنید:');
+        if (categoryName) {
+            // ارسال درخواست AJAX برای اضافه کردن دسته‌بندی جدید
+            $.ajax({
+                url: '/support_system/assets/addCategory',
+                type: 'POST',
+                data: { name: categoryName },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        // اضافه کردن دسته‌بندی جدید به لیست
+                        categorySelect.append(new Option(categoryName, response.id));
+                        categorySelect.val(response.id);
+                        // فراخوانی رویداد تغییر دسته‌بندی
+                        categorySelect.trigger('change');
+                        showAlert('success', 'دسته‌بندی جدید با موفقیت اضافه شد.');
+                    } else {
+                        showModalError('خطا در اضافه کردن دسته‌بندی: ' + response.message);
+                    }
+                },
+                error: function() {
+                    showModalError('خطا در ارتباط با سرور.');
+                }
+            });
+        }
+    });
+    
+    // دکمه افزودن مدل جدید
+    $('#add-model-btn').on('click', function() {
+        const categoryId = categorySelect.val();
+        if (!categoryId) {
+            showModalError('ابتدا یک دسته‌بندی انتخاب کنید.');
+            return;
+        }
+        
+        const modelName = prompt('نام مدل جدید را وارد کنید:');
+        if (modelName) {
+            // ارسال درخواست AJAX برای اضافه کردن مدل جدید
+            $.ajax({
+                url: '/support_system/assets/addModel',
+                type: 'POST',
+                data: { 
+                    name: modelName,
+                    category_id: categoryId
+                },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        // اضافه کردن مدل جدید به لیست
+                        if (!window.modelsByCategoryData[categoryId]) {
+                            window.modelsByCategoryData[categoryId] = [];
+                        }
+                        window.modelsByCategoryData[categoryId].push({
+                            id: response.id,
+                            name: modelName
+                        });
+                        
+                        // بروزرسانی لیست مدل‌ها
+                        updateModelOptions();
+                        modelSelect.val(response.id);
+                        showAlert('success', 'مدل جدید با موفقیت اضافه شد.');
+                    } else {
+                        showModalError('خطا در اضافه کردن مدل: ' + response.message);
+                    }
+                },
+                error: function() {
+                    showModalError('خطا در ارتباط با سرور.');
+                }
+            });
+        }
+    });
+    
+    // ==========================================
+    // بخش 7: جستجوی کاربر با شماره پرسنلی
+    // ==========================================
+
+    // دکمه جستجوی کاربر با شماره پرسنلی
+$(document).on('click', '#search_employee', function(e) {
+    e.preventDefault();
+    
+    console.log("Search employee button clicked");
+    
+    // دریافت مقدار فیلد
+    const employeeNumber = $('#employee_number_add').val().trim();
+    console.log("Employee number to search:", employeeNumber);
+    
+    if (!employeeNumber) {
+        alert('لطفاً شماره پرسنلی را وارد کنید.');
+        return;
+    }
+    
+    // نمایش نشانگر بارگذاری
+    const searchBtn = $(this);
+    const originalBtnText = searchBtn.html();
+    searchBtn.html('<span class="spinner-border spinner-border-sm"></span>').prop('disabled', true);
+    
+    // درخواست به API
+    $.ajax({
+        url: '/support_system/assets/searchUserByEmployeeNumber',
+        type: 'GET',
+        data: { employee_number: employeeNumber },
+        dataType: 'json',
+        success: function(data) {
+            console.log("API Response:", data);
+            
+            if (data.success && data.user) {
+                console.log("User found:", data.user);
+                
+                // تکمیل فیلدها با اطلاعات کاربر
+                $('#employee_name_add').val(data.user.fullname);
+                
+                // اضافه کردن فیلد مخفی برای ذخیره شناسه کاربر
+                if (!$('#user_id').length) {
+                    $('<input>').attr({
+                        type: 'hidden',
+                        id: 'user_id',
+                        name: 'user_id',
+                        value: data.user.id
+                    }).appendTo('#create-asset-form');
+                } else {
+                    $('#user_id').val(data.user.id);
+                }
+                
+                // لاگ کردن شناسه کاربر برای اطمینان
+                console.log("Set user_id to:", data.user.id);
+                
+                // تکمیل فیلد محل استقرار با اطلاعات location
+                if (data.user.location) {
+                    $('#location_add').val(data.user.location);
+                }
+                
+                // تغییر وضعیت تجهیز به "در حال استفاده" اگر وجود داشته باشد
+                if ($('#status_add').length) {
+                    $('#status_add').val('in_use');
+                    console.log("Status changed to 'in_use'");
+                } else {
+                    console.warn("Status field with ID 'status_add' not found");
+                }
+            } else {
+                console.error("Error in response:", data.error || "کاربری با این شماره پرسنلی یافت نشد.");
+                alert(data.error || 'کاربری با این شماره پرسنلی یافت نشد.');
+                clearUserFields();
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("AJAX Error:", status, error);
+            console.error("Response Text:", xhr.responseText);
+            
+            try {
+                const response = JSON.parse(xhr.responseText);
+                alert(response.error || 'خطا در جستجوی کاربر');
+            } catch (e) {
+                alert('خطا در جستجوی کاربر: ' + error);
+            }
+            
+            clearUserFields();
+        },
+        complete: function() {
+            // بازگرداندن دکمه به حالت اولیه
+            searchBtn.html(originalBtnText).prop('disabled', false);
+        }
+    });
+});
+
+// تابع پاک کردن فیلدهای کاربر
+function clearUserFields() {
+    $('#employee_name_add').val('');
+    $('#user_id').val('');
+    $('#location_add').val('');
+}
+
+// اضافه کردن کد برای اطمینان از ارسال user_id در زمان ارسال فرم
+$('#create-asset-form').on('submit', function() {
+    // لاگ کردن مقدار user_id قبل از ارسال فرم
+    console.log("Form submitted with user_id:", $('#user_id').val());
+});
+
+    // ==========================================
+    // بخش 8: توابع کمکی و عمومی
+    // ==========================================
+    
+    // نمایش پیام هشدار در صفحه اصلی
+    function showAlert(type, message) {
+        const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+        const iconClass = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        
+        const alertHtml = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                <i class="fas ${iconClass} me-2"></i> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        
+        // نمایش پیام در بخش هشدارها
+        const alertContainer = $('.alerts-section');
+        alertContainer.html(alertHtml);
+        
+        // حذف خودکار پیام بعد از 5 ثانیه
+        setTimeout(function() {
+            $('.alerts-section .alert').alert('close');
+        }, 5000);
+    }
+});
+
+// ==========================================
+// بخش 9: عیب‌یابی 
+// ==========================================
+
+// ارسال فرم افزودن تجهیز با AJAX
+$('#submit-asset-form').on('click', function() {
+    const form = $('#create-asset-form')[0];
+    
+    // عیب‌یابی: نمایش مقادیر فرم قبل از ارسال
+    console.log("Form values before submission:");
+    console.log("Asset Type:", $('#asset_type').val());
+    console.log("Category:", $('#category_id').val());
+    console.log("Model:", $('#model_id').val());
+    console.log("Status:", $('#status_add').val());  // بررسی مقدار وضعیت
+    console.log("Asset Tag:", $('#asset_tag_add').val());
+    console.log("User ID:", $('#user_id').val());
+    
+    // بررسی اعتبارسنجی فرم
+    if (form.checkValidity()) {
+        // نمایش نشانگر بارگذاری
+        const submitBtn = $(this);
+        const originalBtnText = submitBtn.html();
+        submitBtn.html('<span class="spinner-border spinner-border-sm"></span> در حال ارسال...').prop('disabled', true);
+        
+        // عیب‌یابی: نمایش داده‌های فرم
+        const formData = new FormData(form);
+        console.log("Form data entries:");
+        for (let [key, value] of formData.entries()) {
+            console.log(key, ":", value);
+        }
+        
+        // ارسال فرم با AJAX
+        $.ajax({
+            // بقیه کد بدون تغییر...
+        });
+    } else {
+        // نمایش پیام‌های اعتبارسنجی
+        form.reportValidity();
+    }
+});
